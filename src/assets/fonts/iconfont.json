@@ -1,0 +1,51 @@
+{
+  "id": "1547741",
+  "name": "教务",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon-",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "905458",
+      "name": "首页",
+      "font_class": "shouye",
+      "unicode": "e6a5",
+      "unicode_decimal": 59045
+    },
+    {
+      "icon_id": "1163336",
+      "name": "设置",
+      "font_class": "set",
+      "unicode": "e623",
+      "unicode_decimal": 58915
+    },
+    {
+      "icon_id": "1200054",
+      "name": "师资队伍",
+      "font_class": "shiziduiwu",
+      "unicode": "e6cd",
+      "unicode_decimal": 59085
+    },
+    {
+      "icon_id": "3743537",
+      "name": "12.项目所获成绩",
+      "font_class": "xiangmusuohuochengji",
+      "unicode": "e627",
+      "unicode_decimal": 58919
+    },
+    {
+      "icon_id": "4138853",
+      "name": "学校情况",
+      "font_class": "xuexiaoqingkuang",
+      "unicode": "e676",
+      "unicode_decimal": 58998
+    },
+    {
+      "icon_id": "7504464",
+      "name": "学籍异动",
+      "font_class": "xuejiyidong",
+      "unicode": "e652",
+      "unicode_decimal": 58962
+    }
+  ]
+}

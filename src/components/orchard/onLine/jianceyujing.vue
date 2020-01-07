@@ -1,0 +1,431 @@
+<template>
+    <div>
+        <el-breadcrumb separator-class="el-icon-arrow-right">
+            <el-breadcrumb-item :to="{ path: '/' }">在线监测管理</el-breadcrumb-item>
+            <el-breadcrumb-item>监测预警</el-breadcrumb-item>
+        </el-breadcrumb>
+        <div style="background-color: #fff;padding: 10px ;margin-top: 10px;position: absolute;top: 25px;bottom: 20px;right: 10px;left: 10px;">
+            <div>
+                <el-input v-model="filters.deviceName" placeholder="传感器名称" style="width: 215px;"></el-input>
+                <el-button type="primary" style="margin-left: 15px;" @click="seachRole">搜索</el-button>
+                <span class="dz-zz-right-btn-box">
+                    <!--<el-button type="primary" @click="addRoleDialogShow"><i class="el-icon-lx-add"></i>&nbsp;新增</el-button>-->
+                    <!--<el-button type="danger"><i class="el-icon-lx-delete"></i>&nbsp;批量删除</el-button>-->
+                </span>
+            </div>
+            <div class="dz-zz-table-box">
+                <el-table
+                      ref="multipleTable"
+                      :data="roleList"
+                      tooltip-effect="dark"
+                      style="width: 100%;"
+                      border
+                      v-loading="listLoading"
+                      :height="tableHeight">
+                    <el-table-column
+                          type="selection"
+                          width="55">
+                    </el-table-column>
+                    <el-table-column
+                          label="传感器"
+                          width="150">
+                        <template slot-scope="scope">
+                            <span class="dz-detail-btn" @click="goDetail(scope.row.id)">{{scope.row.deviceName}} <i class="el-icon-caret-right"></i></span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column
+                          label="预警类型"
+                          width="150"
+                          prop="warningName">
+                    </el-table-column>
+                    <el-table-column
+                          prop="actualValue"
+                          width="150"
+                          label="实际值">
+                    </el-table-column>
+                    <el-table-column
+                          prop="description"
+                          label="预警范围">
+                        <template scope="scope">
+                            <span>{{scope.row.min}}~{{scope.row.max}}</span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column
+                          prop="createTime"
+                          label="预警时间">
+                    </el-table-column>
+                    <el-table-column
+                          prop="msg"
+                          label="预警消息">
+                    </el-table-column>
+                </el-table>
+            </div>
+            <div class="block">
+                <el-pagination
+                      layout="total, sizes, prev, pager, next, jumper"
+                      @size-change="handleSizeChange"
+                      @current-change="handleCurrentChange"
+                      background
+                      :page-sizes="[5,10,20,30,40]"
+                      :page-size="pageSize"
+                      :total="total">
+                </el-pagination>
+            </div>
+        </div>
+        <el-dialog :title="addForm.id ? '编辑' : '新增'" :visible.sync="dialogAddVisible" :close-on-click-modal="false" width="30%" :before-close="addRoleDialogHide">
+            <el-form :model="addForm"  :rules="rules" ref="addForm">
+                <el-form-item label="角色名称" :label-width="formLabelWidth" prop="name">
+                    <el-input v-model="addForm.name" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="角色编码" :label-width="formLabelWidth"  prop="code">
+                    <el-input v-model="addForm.code" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="角色说明" :label-width="formLabelWidth"  prop="description">
+                    <el-input v-model="addForm.description" autocomplete="off"></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="addRoleDialogHide">取 消</el-button>
+                <el-button type="primary" @click="addSubmit"  :loading="addLoading">确 定</el-button>
+            </div>
+        </el-dialog>
+
+        <el-drawer
+              title="预警信息"
+              :visible.sync="dialog"
+              direction="rtl"
+              destroy-on-close>
+            <detail :id="detailId"></detail>
+        </el-drawer>
+    </div>
+</template>
+
+<script>
+    import axios from 'axios';
+    import {get, post,put,deletes} from '@/api/fetch.js';
+    import url from '@/api/serviceAPI.config.js';
+    import detail from '@/components/common/warningDetail'
+    export default {
+        name: 'role',
+        data() {
+            let instance = axios.create();
+            return {
+                instance:instance,
+                input:'',
+                tableHeight:document.body.clientHeight-255,
+                pageNum:0,
+                pageSize:10,
+                listLoading: false, //loading
+                filters: {
+                    deviceName: '',
+                },
+                dialogAddVisible:false,
+                formLabelWidth: '80px',
+                addForm:{
+                    name:'',
+                    code:'',
+                    description:''
+                },
+                rules: {
+                    name: [
+                        { required: true, message: '请输入角色名称', trigger: 'blur' },
+                    ],
+                    code: [
+                        { required: true, message: '请输入角色编码', trigger: 'blur' },
+                    ],
+                    description: [
+                        { required: true, message: '请输入角色说明', trigger: 'blur' },
+                    ],
+                },
+                addLoading:false,
+                total:'',
+                roleList:[],
+                bingFunVisible:false,
+                bindfunForm:{
+                    roleCode:'',
+                    funsCodes:''
+                },
+                addOrUpdate:'add',
+                funsTreeData:[],
+                dialog:false,
+                detailId:null,
+            }
+        },
+        components: {
+            detail
+        },
+        computed: {
+        },
+        created(){
+        },
+        activated(){
+        },
+        deactivated(){
+        },
+        mounted(){
+            this.getRole()
+        },
+        methods: {
+            //改变分页信息
+            handleCurrentChange(val) {
+                this.pageNum = val;
+                this.getRole();
+            },
+            handleSizeChange(val) {
+                this.pageSize = val;
+                this.getRole();
+            },
+            //获取角色列表
+            getRole(){
+                let para=Object.assign({pageNum: this.pageNum?this.pageNum-1:this.pageNum, pageSize: this.pageSize,}, this.filters);
+                this.listLoading = true;
+                get(url.video.earlyWarningList,para).then((res)=>{
+                    this.total = res.totalNum;
+                    this.roleList = res.datas;
+                    this.listLoading = false;
+                }).catch(error=>{
+                    console.log(error);
+                });
+            },
+            //显示添加角色弹框
+            addRoleDialogShow(){
+                this.dialogAddVisible=true
+            },
+            //隐藏添加角色弹框
+            addRoleDialogHide(){
+                this.dialogAddVisible=false;
+                this.bingFunVisible=false;
+                this.addForm={
+                    name:'',
+                    code:'',
+                    description:''
+                }
+                this.$refs.funsBindForm.resetFields();
+                this.addLoading = false;
+            },
+            // 新增/编辑 提交事件
+            addSubmit: function () {
+                // 创建实例时设置配置的默认值
+                var instance = axios.create();
+                // 在实例已创建后修改默认值
+                instance.defaults.headers.post['Content-Type'] = 'application/json';
+                this.$refs.addForm.validate((valid) => {
+                    if (valid) {
+                        // 创建实例时设置配置的默认值
+                        this.addLoading = true;
+                        if (this.addForm.id) { // 修改
+                            // 在实例已创建后修改默认值
+                            instance.put(url.role.roleBase, this.addForm).then(result =>{
+                                this.dialogAddVisible = false;
+                                this.$message({
+                                    message: '提交成功',
+                                    type: 'success',
+                                    duration: 1000,
+                                });
+                            }).catch(err => {
+                                console.log(err);
+                            }).finally(() => {
+                                this.addLoading = false;
+                                this.getRole();
+                            })
+                        } else { // 新增
+                            // 在实例已创建后修改默认值
+                            instance.post(url.role.roleBase, this.addForm).then(result =>{
+                                this.dialogAddVisible = false;
+                                this.$message({
+                                    message: '提交成功',
+                                    type: 'success',
+                                    duration: 1000,
+                                });
+                            }).catch(err => {
+                                console.log(err);
+                            }).finally(() => {
+                                this.addLoading = false;
+                                this.getRole();
+                            })
+                        }
+                    }
+                });
+                this.addForm={
+                    name:'',
+                    code:'',
+                    description:''
+                }
+            },
+            //搜索
+            seachRole:function() {
+                this.getRole();
+            },
+            //删除
+            deleteRole: function (id) {
+                this.$confirm('确认删除该记录吗?', '提示', {
+                    type: 'warning'
+                }).then(() => {
+                    this.listLoading = true;
+                    deletes(url.role.roleBase+'/'+id).then((res) => {
+                        this.listLoading = false;
+                        this.$message({
+                            message: '删除成功',
+                            type: 'success'
+                        });
+                        this.getRole();
+                    });
+                }).catch(() => {
+
+                });
+            },
+            // 显示编辑界面
+            editRole(row) {
+                this.dialogAddVisible = true;
+                this.addForm = Object.assign({}, row);  //有现获取列表信息
+                this.getRoleDeatil(row.code);
+            },
+            //回填详情
+            getRoleDeatil(roleId) {
+                get(url.role.getDeatil,{code:roleId}).then((res) => {
+                    this.addForm = res;  //有现获取列表信息
+                });
+            },
+            //绑定功能
+            bindFun:function(code){
+                this.bingFunVisible=true;
+                this.bindfunForm.roleCode=code;
+                get(url.fun.funSearch,{pageNum: 0, pageSize: 1000}).then((res)=>{
+                    console.log(res.datas);
+                    /*this.funsOptions = res.datas;*/
+                    let datas=res.datas;
+                    let tree=[];
+                    for(let i in datas){
+                        let item=datas[i];
+                        if(!item.code.split('-')[1]){  //先得出一级
+                            item.children=[];
+                            tree.push(item);
+                        }
+                    }
+                    for(let i in datas){
+                        let item=datas[i];
+                        if(item.code.split('-')[1]){  //二级
+                            let firstCode=item.code.split('-')[0];
+                            for(let j in tree){
+                                if(tree[j].code==firstCode){
+                                    tree[j].children.push(item);
+                                }
+                            }
+                        }
+                    }
+                    this.funsTreeData=tree;
+                    this.searcnBelongRoles();
+                }).catch(error=>{
+                    console.log(error);
+                });
+            },
+            //搜索所属功能
+            searcnBelongRoles:function(code){
+                get(url.role.getBelongFunsList,{pageNum: 0, pageSize: 1000,roleCode:this.bindfunForm.roleCode}).then((res)=>{
+                    let keyArr=[];
+                    res.datas.map((item)=>{
+                        keyArr.push(item.functionCode);
+                    })
+                    this.$refs.tree.setCheckedKeys(keyArr);
+                    this.bindfunForm.funsCodes=keyArr;
+                    if(res.datas.length){
+                        this.addOrUpdate='update';
+                    }else{
+                        this.addOrUpdate='add';
+                    }
+                    console.log(this.addOrUpdate);
+                }).catch(error=>{
+                    console.log(error);
+                });
+            },
+            // 提交绑定
+            funsbindSubmit: function () {
+                let sendArr=[];
+                for(var i in this.bindfunForm.funsCodes){
+                    let obj={
+                        roleCode:this.bindfunForm.roleCode,
+                        functionCode:this.bindfunForm.funsCodes[i]
+                    };
+                    sendArr.push(obj);
+                }
+                if(this.addOrUpdate=='add'){
+                    this.instance.post(url.role.saveFunsTreeDada,sendArr).then(result =>{
+                        this.bingFunVisible = false;
+                        this.$message({
+                            message: '提交成功',
+                            type: 'success',
+                            duration: 1000,
+                        });
+                    }).catch(err => {
+                        console.log(err);
+                    }).finally(() => {
+                        this.getRole();
+                    });
+                }else{
+                    this.instance.put(url.role.undateFunsTreeDada,sendArr).then(result =>{
+                        this.bingFunVisible = false;
+                        this.$message({
+                            message: '提交成功',
+                            type: 'success',
+                            duration: 1000,
+                        });
+                    }).catch(err => {
+                        console.log(err);
+                    }).finally(() => {
+                        this.getRole();
+                    });
+                }
+
+            },
+            handleNodeClick(data,obj) {
+                this.bindfunForm.funsCodes=obj.checkedKeys;
+            },
+            //详情侧边框
+            goDetail(id){
+                this.detailId=id;
+                this.dialog=true;
+            },
+        },
+    }
+
+</script>
+
+<style scoped>
+    .dz-zz-right-btn-box{
+        float: right;
+    }
+    .dz-zz-right-btn-box .iconfont{
+        font-size: 12px;
+    }
+    .dz-zz-right-btn-box .btn-green{
+        background-color: #2eb976;
+        border-color: #2eb976;
+        color: #fff;
+    }
+    .dz-zz-right-btn-box .btn-green:hover{
+        opacity: .8;
+    }
+    .dz-zz-right-btn-box .btn-blue{
+        background-color: #1c9ba1;
+        border-color: #1c9ba1;
+        color: #fff;
+    }
+    .dz-zz-right-btn-box .btn-blue:hover{
+        opacity: .8;
+    }
+    .dz-zz-btn-box{
+        margin-top: 10px;
+    }
+    .dz-zz-btn-box .iconfont{
+        font-size: 12px;
+    }
+    .dz-zz-table-box{
+        margin-top: 15px;
+    }
+    .block{
+        text-align: center;
+        width: 100%;
+        position: absolute;
+        bottom: 10px;
+    }
+</style>
